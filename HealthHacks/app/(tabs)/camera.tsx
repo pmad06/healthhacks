@@ -10,10 +10,38 @@ export default function CameraScreen() {
 
   const apiKey = 'acc_6329f34077fecdb'; // 🔑 Replace this
 
-  const requestPermissions = async () => {
+  /*const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       alert('Permission to access media library is required!');
+    }
+  };*/
+
+  const requestPermissions = async () => {
+    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
+      alert('Camera and media permissions are required!');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      await requestPermissions();
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.length > 0) {
+        const image = result.assets[0];
+        setImageUri(image.uri);
+        detectFaces(image.uri); // Optional: reuse your face detection
+      }
+    } catch (error) {
+      setError('Error taking photo.');
     }
   };
 
@@ -71,6 +99,8 @@ export default function CameraScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Button title="Pick an Image" onPress={pickImage} />
+      <View style={{ height: 10 }} />
+      <Button title="📸 Take a Photo" onPress={takePhoto} />
       {imageUri && <Image source={{ uri: imageUri }} style={styles.image} />}
       {error && <Text style={styles.error}>{error}</Text>}
       {faces && (
