@@ -7,26 +7,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
-// ✅ Get screen height for full-screen paging
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function MemoryScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
+  const IMAGE_HEIGHT = SCREEN_HEIGHT - tabBarHeight;
+
   const [memories, setMemories] = useState<{ uri: string; date: Date }[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false); // ✅ toggle state
 
   const addMemory = async () => {
-    // ✅ Request media library permission
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
       alert('Permission to access media library is required!');
       return;
     }
 
-    // ✅ Launch image picker with EXIF enabled
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
@@ -36,14 +39,21 @@ export default function MemoryScreen() {
 
     if (!result.canceled && result.assets?.length > 0) {
       const image = result.assets[0];
-
-      // ✅ Extract EXIF date or fallback to today
       const rawDate = image.exif?.DateTimeOriginal || image.exif?.DateTime;
-      const parsedDate = rawDate
-        ? new Date(rawDate.replace(/:/g, '-').replace(' ', 'T'))
-        : new Date();
 
-      // ✅ Add memory and sort by date (newest first)
+      let parsedDate = new Date();
+      if (rawDate && typeof rawDate === 'string') {
+        try {
+          const cleaned = rawDate.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
+          const testDate = new Date(cleaned);
+          if (!isNaN(testDate.getTime())) {
+            parsedDate = testDate;
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to parse EXIF date:', rawDate);
+        }
+      }
+
       const newMemories = [
         ...memories,
         { uri: image.uri, date: parsedDate },
@@ -53,61 +63,69 @@ export default function MemoryScreen() {
     }
   };
 
+  const toggleCalendar = (index: number) => {
+    if (editingIndex === index && isCalendarVisible) {
+      setIsCalendarVisible(false); // ✅ collapse
+      setEditingIndex(null);
+    } else {
+      setEditingIndex(index); // ✅ open
+      setIsCalendarVisible(true);
+    }
+  };
+
   const updateDate = (_event: any, selectedDate?: Date) => {
     if (selectedDate && editingIndex !== null) {
       const updated = [...memories];
       updated[editingIndex].date = selectedDate;
-
-      // ✅ Re-sort after edit
       const sorted = updated.sort((a, b) => b.date.getTime() - a.date.getTime());
       setMemories(sorted);
     }
+    setIsCalendarVisible(false);
     setEditingIndex(null);
   };
 
   return (
     <View style={styles.container}>
-      {/* ✅ Add button to pick image */}
       <TouchableOpacity style={styles.addButton} onPress={addMemory}>
         <Text style={styles.addText}>＋</Text>
       </TouchableOpacity>
 
-      {/* ✅ FlatList with full-screen vertical paging */}
       <FlatList
         data={memories}
         keyExtractor={(_, index) => index.toString()}
         pagingEnabled
-        snapToInterval={SCREEN_HEIGHT}
+        snapToInterval={IMAGE_HEIGHT}
         decelerationRate="fast"
         getItemLayout={(_, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
+          length: IMAGE_HEIGHT,
+          offset: IMAGE_HEIGHT * index,
           index,
         })}
         showsVerticalScrollIndicator={false}
         renderItem={({ item, index }) => (
-          <View style={styles.memoryCard}>
-            <Image source={{ uri: item.uri }} style={styles.image} />
+          <View style={[styles.memoryCard, { height: IMAGE_HEIGHT }]}>
+            <Image source={{ uri: item.uri }} style={[styles.image, { height: IMAGE_HEIGHT }]} />
             <TouchableOpacity
-              style={styles.dateOverlay}
-              onPress={() => setEditingIndex(index)}
+              style={[styles.dateOverlay, { bottom: tabBarHeight + 20 }]}
+              onPress={() => toggleCalendar(index)} // ✅ toggle on tap
             >
               <Text style={styles.dateText}>{item.date.toDateString()}</Text>
             </TouchableOpacity>
+            {editingIndex === index && isCalendarVisible && (
+              <View style={[styles.pickerContainer, { bottom: tabBarHeight + 70 }]}>
+                <DateTimePicker
+                  value={item.date}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+                  onChange={updateDate}
+                  style={styles.datePicker}
+                />
+              </View>
+            )}
           </View>
         )}
         style={{ flex: 1 }}
       />
-
-      {/* ✅ Date picker for editing */}
-      {editingIndex !== null && (
-        <DateTimePicker
-          value={memories[editingIndex].date}
-          mode="date"
-          display="default"
-          onChange={updateDate}
-        />
-      )}
     </View>
   );
 }
@@ -132,18 +150,15 @@ const styles = StyleSheet.create({
   },
   memoryCard: {
     width: '100%',
-    height: SCREEN_HEIGHT, // ✅ full screen height
     justifyContent: 'center',
     alignItems: 'center',
   },
   image: {
     width: '100%',
-    height: SCREEN_HEIGHT, // ✅ force image to fill screen
     resizeMode: 'cover',
   },
   dateOverlay: {
     position: 'absolute',
-    bottom: 20,
     left: 20,
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 8,
@@ -153,5 +168,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  pickerContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    backgroundColor: '#111',
+    borderRadius: 10,
+    padding: 10,
+  },
+  datePicker: {
+    width: '100%',
   },
 });
