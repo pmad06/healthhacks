@@ -9,27 +9,74 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
+import base64 from 'base-64';
 
 export default function CameraScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [faces, setFaces] = useState<any>(null);
+  const [tags, setTags] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<'face' | 'read' | null>(null);
+  const [mode, setMode] = useState<'read' | null>(null);
 
-  const apiKey = 'acc_6329f34077fecdb'; // 🔑 Replace with your actual key
+  // 🔑 Replace these with your actual Imagga API key and secret
+  const apiKey = 'acc_6329f34077fecdb';
+  const apiSecret = 'YOUR_IMAGGA_API_SECRET';
 
+  // Request camera and media library permissions
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
       alert('Camera and media permissions are required!');
+      return false;
+    }
+    return true;
+  };
+
+  // Analyze image with Imagga tags API
+  const analyzeImageTags = async (uri: string) => {
+    try {
+      setError(null);
+      setTags([]);
+
+      const formData = new FormData();
+
+      const file = {
+        uri,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
+      } as any;
+
+      formData.append('image', file);
+
+      const authHeader = 'Basic ' + base64.encode(apiKey + ':' + apiSecret);
+
+      const response = await axios.post('https://api.imagga.com/v2/tags', formData, {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const tagsResult = response.data.result.tags;
+
+      if (tagsResult.length > 0) {
+        setTags(tagsResult);
+      } else {
+        setError('No tags detected.');
+      }
+    } catch (err) {
+      console.error('Image analysis error:', err);
+      setError('Error analyzing image.');
     }
   };
 
+  // Pick image from library
   const pickImage = async () => {
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) return;
+
     try {
-      await requestPermissions();
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
@@ -42,20 +89,20 @@ export default function CameraScreen() {
         setImageUri(image.uri);
 
         if (mode === 'read') {
-          console.log('🧠 Ready to run OCR or reading logic here');
+          analyzeImageTags(image.uri);
         }
-        // else if (mode === 'face') {
-        //   detectFaces(image.uri);
-        // }
       }
-    } catch (error) {
+    } catch (err) {
       setError('Error selecting image.');
     }
   };
 
+  // Take photo with camera
   const takePhoto = async () => {
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) return;
+
     try {
-      await requestPermissions();
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
         quality: 1,
@@ -67,52 +114,19 @@ export default function CameraScreen() {
         setImageUri(image.uri);
 
         if (mode === 'read') {
-          console.log('🧠 Ready to run OCR or reading logic here');
+          analyzeImageTags(image.uri);
         }
-        // else if (mode === 'face') {
-        //   detectFaces(image.uri);
-        // }
       }
-    } catch (error) {
+    } catch (err) {
       setError('Error taking photo.');
     }
   };
 
-  // const detectFaces = async (uri: string) => {
-  //   try {
-  //     const formData = new FormData();
-  //     const file = {
-  //       uri,
-  //       type: 'image/jpeg',
-  //       name: 'photo.jpg',
-  //     } as any;
-
-  //     formData.append('image', file);
-
-  //     const response = await axios.post('https://api.imagga.com/v2/faces', formData, {
-  //       headers: {
-  //         Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`,
-  //         'Content-Type': 'multipart/form-data',
-  //       },
-  //     });
-
-  //     const facesDetected = response.data.result.faces;
-
-  //     if (facesDetected.length > 0) {
-  //       setFaces(facesDetected);
-  //       setError(null);
-  //     } else {
-  //       setError('No faces detected.');
-  //       setFaces(null);
-  //     }
-  //   } catch (error) {
-  //     setError('Error during face detection.');
-  //   }
-  // };
-
+  // Reset mode and clear tags/error when new image is picked
   useEffect(() => {
     if (imageUri) {
-      setMode(null); // Reset mode after action
+      setMode(null);
+      setError(null);
     }
   }, [imageUri]);
 
@@ -121,16 +135,24 @@ export default function CameraScreen() {
       <Text style={styles.title}>📷 Smart Image Reader</Text>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.button} onPress={() => { setMode('read'); pickImage(); }}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => {
+            setMode('read');
+            pickImage();
+          }}
+        >
           <Text style={styles.buttonText}>📁 Upload Image</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => { setMode('read'); takePhoto(); }}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => {
+            setMode('read');
+            takePhoto();
+          }}
+        >
           <Text style={styles.buttonText}>📸 Take Photo</Text>
         </TouchableOpacity>
-
-        {/* <TouchableOpacity style={styles.button} onPress={() => { setMode('face'); takePhoto(); }}>
-          <Text style={styles.buttonText}>🔒 Use Camera for Face ID</Text>
-        </TouchableOpacity> */}
       </View>
 
       {imageUri && (
@@ -141,12 +163,12 @@ export default function CameraScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
 
-      {faces && (
+      {tags.length > 0 && (
         <View style={styles.result}>
-          <Text style={styles.resultTitle}>👤 Faces Detected: {faces.length}</Text>
-          {faces.map((face: any, idx: number) => (
+          <Text style={styles.resultTitle}>🔖 Image Tags:</Text>
+          {tags.map((tag, idx) => (
             <Text key={idx} style={styles.resultText}>
-              • Face {idx + 1} — Confidence: {(face.confidence * 100).toFixed(2)}%
+              • {tag.tag.en} ({(tag.confidence * 100).toFixed(2)}%)
             </Text>
           ))}
         </View>
@@ -160,7 +182,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e6f2ff', // 🌤️ light blue
+    backgroundColor: '#e6f2ff',
     padding: 24,
   },
   title: {
@@ -214,6 +236,6 @@ const styles = StyleSheet.create({
   },
   resultText: {
     fontSize: 16,
-    color: '#444',
+    color: '#000',
   },
 });
