@@ -89,9 +89,10 @@ export default function CameraScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1, // ✅ makes it fill the screen
+    justifyContent: 'center', // ✅ vertical centering
+    alignItems: 'center',     // ✅ horizontal centering
     padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   image: {
     marginTop: 20,
@@ -103,4 +104,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: 'red',
   },
+  
 });
