@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,22 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import axios from 'axios';
-import base64 from 'base-64';
 
 export default function CameraScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [tags, setTags] = useState<any[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<'read' | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // 🔑 Replace these with your actual Imagga API key and secret
-  const apiKey = 'acc_6329f34077fecdb';
-  const apiSecret = 'YOUR_IMAGGA_API_SECRET';
-
-  // Request camera and media library permissions
+  // Request permissions for camera and media library
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -33,41 +30,45 @@ export default function CameraScreen() {
     return true;
   };
 
-  // Analyze image with Imagga tags API
-  const analyzeImageTags = async (uri: string) => {
+  // Analyze image text using OCR.space API
+  const analyzeImageText = async (uri: string) => {
+    setLoading(true);
+    setError(null);
+    setTags([]);
+
     try {
-      setError(null);
-      setTags([]);
+      const base64Img = await FileSystem.readAsStringAsync(uri, {
+        encoding: 'base64',
+      });
 
       const formData = new FormData();
+      formData.append('base64Image', 'data:image/jpeg;base64,' + base64Img);
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
 
-      const file = {
-        uri,
-        type: 'image/jpeg',
-        name: 'photo.jpg',
-      } as any;
-
-      formData.append('image', file);
-
-      const authHeader = 'Basic ' + base64.encode(apiKey + ':' + apiSecret);
-
-      const response = await axios.post('https://api.imagga.com/v2/tags', formData, {
+      const response = await axios.post('https://api.ocr.space/parse/image', formData, {
         headers: {
-          Authorization: authHeader,
+          apikey: 'K86463749088957', // Your API key here
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      const tagsResult = response.data.result.tags;
+      const parsed = response.data.ParsedResults?.[0];
+      const text = parsed?.ParsedText;
 
-      if (tagsResult.length > 0) {
-        setTags(tagsResult);
+      console.log('Extracted text:', text);
+
+      if (text) {
+        const lines: string[] = text.split('\n').filter((line: string) => line.trim() !== '');
+        setTags(lines);
       } else {
-        setError('No tags detected.');
+        setError('No text detected.');
       }
     } catch (err) {
-      console.error('Image analysis error:', err);
-      setError('Error analyzing image.');
+      console.error('OCR error:', err);
+      setError('Error analyzing image for text.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,12 +88,9 @@ export default function CameraScreen() {
       if (!result.canceled && result.assets?.length > 0) {
         const image = result.assets[0];
         setImageUri(image.uri);
-
-        if (mode === 'read') {
-          analyzeImageTags(image.uri);
-        }
+        analyzeImageText(image.uri);
       }
-    } catch (err) {
+    } catch {
       setError('Error selecting image.');
     }
   };
@@ -112,45 +110,22 @@ export default function CameraScreen() {
       if (!result.canceled && result.assets?.length > 0) {
         const image = result.assets[0];
         setImageUri(image.uri);
-
-        if (mode === 'read') {
-          analyzeImageTags(image.uri);
-        }
+        analyzeImageText(image.uri);
       }
-    } catch (err) {
+    } catch {
       setError('Error taking photo.');
     }
   };
 
-  // Reset mode and clear tags/error when new image is picked
-  useEffect(() => {
-    if (imageUri) {
-      setMode(null);
-      setError(null);
-    }
-  }, [imageUri]);
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>📷 Smart Image Reader</Text>
+      <Text style={styles.title}>📷 Smart Text Scanner</Text>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => {
-            setMode('read');
-            pickImage();
-          }}
-        >
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
           <Text style={styles.buttonText}>📁 Upload Image</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => {
-            setMode('read');
-            takePhoto();
-          }}
-        >
+        <TouchableOpacity style={styles.button} onPress={takePhoto}>
           <Text style={styles.buttonText}>📸 Take Photo</Text>
         </TouchableOpacity>
       </View>
@@ -161,14 +136,16 @@ export default function CameraScreen() {
         </View>
       )}
 
+      {loading && <ActivityIndicator size="large" color="#4a90e2" style={{ marginTop: 20 }} />}
+
       {error && <Text style={styles.error}>{error}</Text>}
 
       {tags.length > 0 && (
         <View style={styles.result}>
-          <Text style={styles.resultTitle}>🔖 Image Tags:</Text>
-          {tags.map((tag, idx) => (
+          <Text style={styles.resultTitle}>📝 Extracted Text:</Text>
+          {tags.map((line, idx) => (
             <Text key={idx} style={styles.resultText}>
-              • {tag.tag.en} ({(tag.confidence * 100).toFixed(2)}%)
+              {line}
             </Text>
           ))}
         </View>
@@ -233,6 +210,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
+    color: '#000',
   },
   resultText: {
     fontSize: 16,
