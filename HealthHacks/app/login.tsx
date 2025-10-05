@@ -52,7 +52,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to HealthHacks</Text>
+      <Text style={styles.title}>RemindRx</Text>
 
       <TouchableOpacity style={styles.faceIDButton} onPress={openCamera}>
         <Text style={styles.buttonText}>Face ID</Text>
