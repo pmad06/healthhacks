@@ -119,15 +119,16 @@ export default function CameraScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>📷 Smart Text Scanner</Text>
+      <Text style={styles.title}>Scanner</Text>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.button} onPress={pickImage}>
-          <Text style={styles.buttonText}>📁 Upload Image</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={takePhoto}>
           <Text style={styles.buttonText}>📸 Take Photo</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
+          <Text style={styles.buttonText}>📁 Upload Image</Text>
+        </TouchableOpacity>
+        
       </View>
 
       {imageUri && (
@@ -159,21 +160,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e6f2ff',
+    backgroundColor: '#e1e9c9',
     padding: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: '600',
     marginBottom: 20,
-    color: '#333',
+    color: '#224d74',
   },
   buttonRow: {
     width: '100%',
     marginBottom: 20,
   },
   button: {
-    backgroundColor: '#4a90e2',
+    backgroundColor: '#224d74',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   buttonText: {
-    color: '#fff',
+    color: '#e1e9c9',
     fontWeight: '500',
     fontSize: 16,
   },
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     elevation: 3,
-    backgroundColor: '#fff',
+    backgroundColor: '#e1e9c9',
   },
   image: {
     width: 300,
@@ -210,10 +211,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#000',
+    color: '#224d74',
   },
   resultText: {
     fontSize: 16,
-    color: '#000',
+    color: '#224d74',
   },
 });
