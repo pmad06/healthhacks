@@ -181,3 +181,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 });
+
+
+import * as Notifications from 'expo-notifications';
+
+const sendTestNotification = async () => {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Test Notification',
+      body: 'This is just a demo to confirm it works.',
+    },
+    trigger: {
+      seconds: 2,
+    } as Notifications.NotificationTriggerInput, // ✅ Type-safe cast
+  });
+};

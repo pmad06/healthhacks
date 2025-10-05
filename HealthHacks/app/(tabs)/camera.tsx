@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -25,108 +26,68 @@ export default function CameraScreen() {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
-      alert('Camera and media permissions are required!');
+      Alert.alert('Camera and media permissions are required!');
       return false;
     }
     return true;
   };
 
   const knownDrugs = [
-  'Amoxicillin', 'Ibuprofen', 'Paracetamol', 'Metformin', 'Atorvastatin',
-  'Omeprazole', 'Amlodipine', 'Lisinopril', 'Hydrochlorothiazide', 'Simvastatin',
-  'Azithromycin', 'Albuterol', 'Levothyroxine', 'Gabapentin', 'Sertraline'
-];
+    'Amoxicillin', 'Ibuprofen', 'Paracetamol', 'Metformin', 'Atorvastatin',
+    'Omeprazole', 'Amlodipine', 'Lisinopril', 'Hydrochlorothiazide', 'Simvastatin',
+    'Azithromycin', 'Albuterol', 'Levothyroxine', 'Gabapentin', 'Sertraline'
+  ];
 
   const analyzeImageText = async (uri: string) => {
-
     setLoading(true);
     setError(null);
     setTags([]);
     setDrugEventData([]);
 
     try {
-    const base64Img = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const base64Img = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
 
-    const formData = new FormData();
-    formData.append('base64Image', 'data:image/jpeg;base64,' + base64Img);
-    formData.append('language', 'eng');
-    formData.append('isOverlayRequired', 'false');
+      const formData = new FormData();
+      formData.append('base64Image', 'data:image/jpeg;base64,' + base64Img);
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
 
-    const response = await axios.post('https://api.ocr.space/parse/image', formData, {
-      headers: {
-        apikey: 'K86463749088957',
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+      const response = await axios.post('https://api.ocr.space/parse/image', formData, {
+        headers: {
+          apikey: 'K86463749088957',
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-    const parsed = response.data.ParsedResults?.[0];
-    const text = parsed?.ParsedText;
+      const parsed = response.data.ParsedResults?.[0];
+      const text = parsed?.ParsedText;
 
-    if (text) {
-      const lines: string[] = text.split('\n').filter((line: string) => line.trim() !== '');
-      const medicineRegex = /\b([A-Za-z]{4,})\b/g;
-      const allWords = lines.join(' ').match(medicineRegex) || [];
+      if (text) {
+        const lines: string[] = text.split('\n').filter((line: string) => line.trim() !== '');
+        const medicineRegex = /\b([A-Za-z]{4,})\b/g;
+        const allWords = lines.join(' ').match(medicineRegex) || [];
 
-      const filteredMeds = Array.from(new Set(
-        allWords.filter((word) =>
-          knownDrugs.some((drug) => drug.toLowerCase() === word.toLowerCase())
-        )
-      ));
+        const filteredMeds = Array.from(new Set(
+          allWords.filter((word) =>
+            knownDrugs.some((drug) => drug.toLowerCase() === word.toLowerCase())
+          )
+        ));
 
-      if (filteredMeds.length > 0) {
-        setTags(filteredMeds);
-        filteredMeds.slice(0, 5).forEach((med) => fetchDrugEventData(med));
+        if (filteredMeds.length > 0) {
+          setTags(filteredMeds);
+          filteredMeds.slice(0, 5).forEach((med) => fetchDrugEventData(med));
+        } else {
+          setError('No valid medication names found in extracted text.');
+        }
       } else {
-        setError('No valid medication names found in extracted text.');
+        setError('No text detected.');
       }
-    } else {
-      setError('No text detected.');
+    } catch (err) {
+      console.error('OCR error:', err);
+      setError('Error analyzing image for text.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('OCR error:', err);
-    setError('Error analyzing image for text.');
-  } finally {
-    setLoading(false);
-  }
-
-//     if (text) {
-//       const lines: string[] = text.split('\n').filter((line: string) => line.trim() !== '');
-//       const medicineRegex = /\b([A-Z][a-z]{3,}(?:\s[A-Z][a-z]{3,})?)\b/g;
-//       const allMatches = lines.join(' ').match(medicineRegex) || [];
-
-//       const blacklist = [
-//         'Patient', 'Name', 'Color', 'Tablet', 'Capsule', 'Take', 'Daily',
-//         'Once', 'Twice', 'Before', 'After', 'Mg', 'Ml', 'Dose', 'Every',
-//         'Morning', 'Evening', 'Night', 'Day', 'Week', 'Month', 'White',
-//         'Blue', 'Red', 'Yellow', 'Green', 'Pill', 'Medicine', 'Medication',
-//         'Use', 'For', 'The', 'And', 'Of', 'In', 'To', 'A', 'Is', 'With',
-//         'Capsules', 'Tablets', 'As', 'Needed', 'Not', 'More', 'Than', 'This',
-//         'Donald', 'Kong', 'Amoxy', 'On', 'Cap'
-//       ];
-
-
-//   const filteredMeds = Array.from(new Set(
-//   allMatches.filter((word) => {
-//     const lower = word.toLowerCase();
-//     return !blacklist.some((b) => lower.includes(b.toLowerCase()));
-//   })
-// ));
-//       if (filteredMeds.length > 0) {
-//         setTags(filteredMeds);
-//         filteredMeds.slice(0, 5).forEach((med) => fetchDrugEventData(med));
-//       } else {
-//         setError('No valid medication names found in extracted text.');
-//       }
-//     } else {
-//       setError('No text detected.');
-//     }
-//   } catch (err) {
-//     console.error('OCR error:', err);
-//     setError('Error analyzing image for text.');
-//   } finally {
-//     setLoading(false);
-//   }
-
   };
 
   const fetchDrugEventData = async (searchTerm: string) => {
@@ -142,7 +103,7 @@ export default function CameraScreen() {
           sourceDrug: searchTerm,
         }));
         setDrugEventData((prev) => [...prev, ...taggedResults]);
-      }else{
+      } else {
         console.warn(`No FDA drug info found for "${searchTerm}".`);
       }
     } catch (err) {
@@ -204,12 +165,21 @@ export default function CameraScreen() {
         <TouchableOpacity style={styles.button} onPress={pickImage}>
           <Text style={styles.buttonText}>📁 Upload Image</Text>
         </TouchableOpacity>
-        
       </View>
 
       {imageUri && (
-        <View style={styles.card}>
-          <Image source={{ uri: imageUri }} style={styles.image} />
+        <View style={styles.imageBlock}>
+          <View style={styles.card}>
+            <Image source={{ uri: imageUri }} style={styles.image} />
+          </View>
+
+          <View style={styles.tagStack}>
+            {tags.map((tag, idx) => (
+              <View key={idx} style={styles.tagBox}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -220,12 +190,8 @@ export default function CameraScreen() {
         <View style={styles.result}>
           {drugEventData.map((event, idx) => (
             <View key={idx} style={styles.eventItem}>
-              <Text style={styles.resultText}>
-                Medicine: {event?.sourceDrug ?? 'N/A'}
-              </Text>
-              <Text style={styles.resultText}>
-                Event ID: {event?.primaryid ?? 'N/A'}
-              </Text>
+              <Text style={styles.resultText}>Medicine: {event?.sourceDrug ?? 'N/A'}</Text>
+              <Text style={styles.resultText}>Event ID: {event?.primaryid ?? 'N/A'}</Text>
               <Text style={styles.resultText}>
                 Reaction: {Array.isArray(event?.patient?.reaction)
                   ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
@@ -276,8 +242,31 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 16,
   },
-  card: {
+  imageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 10,
+  },
+  tagColumn: {
+    marginRight: 12,
+    alignItems: 'flex-end',
+  },
+    tagBox: {
+    backgroundColor: '#224d74',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginBottom: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  tagText: {
+    color: '#e1e9c9',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  card: {
     borderRadius: 12,
     overflow: 'hidden',
     elevation: 3,
@@ -296,14 +285,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignItems: 'flex-start',
   },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#000',
-  },
   resultText: {
     fontSize: 16,
-    color: '#000',
+    color: '#224d74',
+    marginBottom: 4,
+  },
+  eventItem: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    width: '100%',
   },
 });
