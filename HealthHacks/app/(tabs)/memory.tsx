@@ -133,14 +133,14 @@ export default function MemoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#e1e9c9',
   },
   addButton: {
     position: 'absolute',
     top: 40,
     left: 20,
     zIndex: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#e1e9c9',
     borderRadius: 20,
     padding: 10,
   },
@@ -160,12 +160,12 @@ const styles = StyleSheet.create({
   dateOverlay: {
     position: 'absolute',
     left: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#e1e9c9',
     padding: 8,
     borderRadius: 6,
   },
   dateText: {
-    color: '#fff',
+    color: '#224d74',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    backgroundColor: '#111',
+    backgroundColor: '#224d74',
     borderRadius: 10,
     padding: 10,
   },

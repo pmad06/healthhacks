@@ -1,29 +1,35 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { Image } from 'react-native';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}
-    >
+    <Tabs>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: '',
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require('../../assets/logo.png')}
+              style={{
+                width: 24,
+                height: 24,
+                //tintColor: focused ? '#4CAF50' : '#aaa',
+              }}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="camera"
+        options={{
+          title: 'Camera',
+        }}
+      />
       <Tabs.Screen
         name="memory"
         options={{
           title: 'Memory',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="photo.fill.on.rectangle.fill" color={color} />
-          ),
         }}
       />
     </Tabs>
