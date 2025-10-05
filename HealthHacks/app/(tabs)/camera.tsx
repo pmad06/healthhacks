@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#e1e9c9',
-    fontWeight: '500',
+    fontWeight: '501',
     fontSize: 16,
   },
   imageRow: {
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   },
   error: {
     marginTop: 10,
-    color: '#d9534f',
+    color: '#dc423dff',
     fontWeight: '500',
   },
   result: {
@@ -298,3 +298,4 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 });
+//yolo
