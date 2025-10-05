@@ -75,7 +75,10 @@ export default function CameraScreen() {
 
         if (filteredMeds.length > 0) {
           setTags(filteredMeds);
-          filteredMeds.slice(0, 5).forEach((med) => fetchDrugEventData(med));
+          filteredMeds.slice(0, 5).forEach((med) => {
+  fetchDrugEventData(med);      // FDA drug info
+  fetchAdverseEvents(med);      // Adverse events
+});
         } else {
           setError('No valid medication names found in extracted text.');
         }
@@ -93,7 +96,7 @@ export default function CameraScreen() {
   const fetchDrugEventData = async (searchTerm: string) => {
     try {
       const response = await axios.get(
-        `https://api.fda.gov/drug/drugsfda.json?api_key=${openFDAKey}&search=products.brand_name:"${searchTerm}"&limit=5`
+        `https://api.fda.gov/drug/drugsfda.json?api_key=${openFDAKey}&search=products.brand_name:"${searchTerm}"&limit=1`
       );
 
       const data = response.data;
@@ -110,6 +113,29 @@ export default function CameraScreen() {
       console.error(`Error fetching data for ${searchTerm}:`, err);
     }
   };
+
+  const fetchAdverseEvents = async (searchTerm: string) => {
+  try {
+    const response = await axios.get(
+      `https://api.fda.gov/drug/event.json?api_key=${openFDAKey}&search=patient.drug.medicinalproduct:"${searchTerm}"&limit=5`
+    );
+
+    const data = response.data;
+    if (data.results && data.results.length > 0) {
+      const taggedResults = data.results.map((r: any) => ({
+        ...r,
+        sourceDrug: searchTerm,
+        isAdverseEvent: true,
+      }));
+      setDrugEventData((prev) => [...prev, ...taggedResults]);
+    } else {
+      console.warn(`No adverse events found for "${searchTerm}".`);
+    }
+  } catch (err) {
+    console.error(`Error fetching adverse events for ${searchTerm}:`, err);
+  }
+};
+
 
   const pickImage = async () => {
     const hasPermissions = await requestPermissions();
@@ -190,8 +216,34 @@ export default function CameraScreen() {
         <View style={styles.result}>
           {drugEventData.map((event, idx) => (
             <View key={idx} style={styles.eventItem}>
-              <Text style={styles.resultText}>Medicine: {event?.sourceDrug ?? 'N/A'}</Text>
-              <Text style={styles.resultText}>Event ID: {event?.primaryid ?? 'N/A'}</Text>
+              <Text style={styles.resultText}>
+                Medicine: {event?.sourceDrug ?? 'N/A'}
+              </Text>
+              {event.isAdverseEvent ? (
+                  <>
+                    {/* <Text style={styles.resultText}>
+                      Event ID: {event?.primaryid ?? 'N/A'}
+                    </Text> */}
+                    <Text style={styles.resultText}>
+                      Reaction: {Array.isArray(event?.patient?.reaction)
+                        ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
+                        : 'N/A'}
+                    </Text>
+                    {/* <Text style={styles.resultText}>
+                      Drug: {Array.isArray(event?.patient?.drug)
+                        ? event.patient.drug.map((d: any) => d.medicinalproduct).join(', ')
+                        : 'N/A'}
+                    </Text> */}
+                  </>
+          ) : (
+              <>
+                {/* <Text style={styles.resultText}>
+                  Manufacturer: {event.openfda?.manufacturer_name?.[0] ?? 'N/A'}
+                </Text> */}
+              </>
+            )}
+              {/* <Text style={styles.resultText}>Event ID: {event?.primaryid ?? 'N/A'}</Text>
+
               <Text style={styles.resultText}>
                 Reaction: {Array.isArray(event?.patient?.reaction)
                   ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
@@ -201,7 +253,7 @@ export default function CameraScreen() {
                 Drug: {Array.isArray(event?.drug)
                   ? event.drug.map((d: any) => d.medicinalproduct).join(', ')
                   : 'N/A'}
-              </Text>
+              </Text> */}
             </View>
           ))}
         </View>
