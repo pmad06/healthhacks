@@ -18,7 +18,8 @@ export default function CameraScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [drugEventData, setDrugEventData] = useState<any[]>([]);
+  const [drugInfoData, setDrugInfoData] = useState<any[]>([]);
+  const [labelInfoData, setLabelInfoData] = useState<any[]>([]);
 
   const openFDAKey = '3HvAqsee8LTDH2ERCbrdrnVnattSEZH3abUgKtMr';
 
@@ -42,7 +43,8 @@ export default function CameraScreen() {
     setLoading(true);
     setError(null);
     setTags([]);
-    setDrugEventData([]);
+    setDrugInfoData([]);
+    setLabelInfoData([]);
 
     try {
       const base64Img = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
@@ -76,8 +78,9 @@ export default function CameraScreen() {
         if (filteredMeds.length > 0) {
           setTags(filteredMeds);
           filteredMeds.slice(0, 5).forEach((med) => {
-  fetchDrugEventData(med);      // FDA drug info
-  fetchAdverseEvents(med);      // Adverse events
+  fetchDrugInfoData(med);      // FDA drug info
+  fetchDrugLabelInfo(med); // Drug labeling info (e.g. interactions, warnings)
+  fetchAdverseEvents(med); 
 });
         } else {
           setError('No valid medication names found in extracted text.');
@@ -93,7 +96,7 @@ export default function CameraScreen() {
     }
   };
 
-  const fetchDrugEventData = async (searchTerm: string) => {
+  const fetchDrugInfoData = async (searchTerm: string) => {
     try {
       const response = await axios.get(
         `https://api.fda.gov/drug/drugsfda.json?api_key=${openFDAKey}&search=products.brand_name:"${searchTerm}"&limit=1`
@@ -105,7 +108,7 @@ export default function CameraScreen() {
           ...r,
           sourceDrug: searchTerm,
         }));
-        setDrugEventData((prev) => [...prev, ...taggedResults]);
+        setDrugInfoData((prev) => [...prev, ...taggedResults]);
       } else {
         console.warn(`No FDA drug info found for "${searchTerm}".`);
       }
@@ -114,7 +117,32 @@ export default function CameraScreen() {
     }
   };
 
-  const fetchAdverseEvents = async (searchTerm: string) => {
+ 
+
+
+const fetchDrugLabelInfo = async (searchTerm: string) => {
+  try {
+    const response = await axios.get(
+      `https://api.fda.gov/drug/label.json?api_key=${openFDAKey}&search=openfda.brand_name:"${searchTerm}"&limit=5`
+    );
+
+    const data = response.data;
+    if (data.results && data.results.length > 0) {
+      const taggedResults = data.results.map((r: any) => ({
+        ...r,
+        sourceInteraction: searchTerm,
+        isLabelInfo: true,
+      }));
+      setLabelInfoData((prev) => [...prev, ...taggedResults]);
+    } else {
+      console.warn(`No drug label info found for interaction with "${searchTerm}".`);
+    }
+  } catch (err) {
+    console.error(`Error fetching drug label info for "${searchTerm}":`, err);
+  }
+};
+
+ const fetchAdverseEvents = async (searchTerm: string) => {
   try {
     const response = await axios.get(
       `https://api.fda.gov/drug/event.json?api_key=${openFDAKey}&search=patient.drug.medicinalproduct:"${searchTerm}"&limit=5`
@@ -127,15 +155,14 @@ export default function CameraScreen() {
         sourceDrug: searchTerm,
         isAdverseEvent: true,
       }));
-      setDrugEventData((prev) => [...prev, ...taggedResults]);
+      setDrugInfoData((prev) => [...prev, ...taggedResults]);
     } else {
       console.warn(`No adverse events found for "${searchTerm}".`);
     }
   } catch (err) {
-    console.error(`Error fetching adverse events for ${searchTerm}:`, err);
+    console.error(`Error fetching adverse events for "${searchTerm}":`, err);
   }
 };
-
 
   const pickImage = async () => {
     const hasPermissions = await requestPermissions();
@@ -212,52 +239,69 @@ export default function CameraScreen() {
       {loading && <ActivityIndicator size="large" color="#4a90e2" style={{ marginTop: 20 }} />}
       {error && <Text style={styles.error}>{error}</Text>}
 
-      {drugEventData.length > 0 && (
+      {drugInfoData.filter(e => e.isAdverseEvent).length > 0 && (
+  <View style={styles.result}>
+    <Text style={styles.resultText}>⚠️ Adverse Events</Text>
+    {drugInfoData.filter(e => e.isAdverseEvent).map((event, idx) => (
+      <View key={idx} style={styles.eventItem}>
+        <Text style={styles.resultText}>
+          Medicine: {event?.sourceDrug ?? 'N/A'}
+        </Text>
+        <Text style={styles.resultText}>
+          Reactions: {Array.isArray(event.patient?.reaction)
+            ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
+            : 'N/A'}
+        </Text>
+        <Text style={styles.resultText}>
+          Drugs Involved: {Array.isArray(event.patient?.drug)
+            ? event.patient.drug.map((d: any) => d.medicinalproduct).join(', ')
+            : 'N/A'}
+        </Text>
+      </View>
+    ))}
+  </View>
+)}
+      {/* {drugEventData.length > 0 && (
         <View style={styles.result}>
           {drugEventData.map((event, idx) => (
             <View key={idx} style={styles.eventItem}>
               <Text style={styles.resultText}>
                 Medicine: {event?.sourceDrug ?? 'N/A'}
               </Text>
-              {event.isAdverseEvent ? (
-                  <>
-                    {/* <Text style={styles.resultText}>
-                      Event ID: {event?.primaryid ?? 'N/A'}
-                    </Text> */}
-                    <Text style={styles.resultText}>
-                      Reaction: {Array.isArray(event?.patient?.reaction)
-                        ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
-                        : 'N/A'}
-                    </Text>
-                    {/* <Text style={styles.resultText}>
-                      Drug: {Array.isArray(event?.patient?.drug)
-                        ? event.patient.drug.map((d: any) => d.medicinalproduct).join(', ')
-                        : 'N/A'}
-                    </Text> */}
-                  </>
-          ) : (
-              <>
-                {/* <Text style={styles.resultText}>
-                  Manufacturer: {event.openfda?.manufacturer_name?.[0] ?? 'N/A'}
-                </Text> */}
-              </>
-            )}
-              {/* <Text style={styles.resultText}>Event ID: {event?.primaryid ?? 'N/A'}</Text>
-
-              <Text style={styles.resultText}>
-                Reaction: {Array.isArray(event?.patient?.reaction)
-                  ? event.patient.reaction.map((r: any) => r.reactionmeddrapt).join(', ')
-                  : 'N/A'}
-              </Text>
-              <Text style={styles.resultText}>
-                Drug: {Array.isArray(event?.drug)
-                  ? event.drug.map((d: any) => d.medicinalproduct).join(', ')
-                  : 'N/A'}
-              </Text> */}
             </View>
           ))}
         </View>
-      )}
+      )} */}
+{labelInfoData.length > 0 && (
+  <View style={styles.result}>
+    <Text style={styles.resultText}>📄 Drug Label Info</Text>
+    {labelInfoData.map((event, idx) => (
+      <View key={idx} style={styles.eventItem}>
+        <Text style={styles.resultText}>
+          Medicine: {event?.sourceInteraction ?? 'N/A'}
+        </Text>
+        {event.purpose && (
+          <Text style={styles.resultText}>
+            Purpose: {Array.isArray(event.purpose) ? event.purpose.join(', ') : event.purpose}
+          </Text>
+        )}
+        {event.warnings && (
+          <Text style={styles.resultText}>
+            Warnings: {Array.isArray(event.warnings) ? event.warnings.join(', ') : event.warnings}
+          </Text>
+        )}
+        {event.drug_interactions && (
+          <Text style={styles.resultText}>
+            Drug Interactions: {Array.isArray(event.drug_interactions)
+              ? event.drug_interactions.join(', ')
+              : event.drug_interactions}
+          </Text>
+        )}
+      </View>
+    ))}
+  </View>
+)}
+
     </ScrollView>
   );
 }
